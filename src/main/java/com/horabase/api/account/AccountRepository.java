@@ -25,4 +25,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
             Long businessId,
             String email
     );
+
+    boolean existsByBusiness_IdAndEmailIgnoreCaseAndIdNot(
+            Long businessId,
+            String email,
+            Long accountId
+    );
 }
