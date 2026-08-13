@@ -28,6 +28,15 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             OffsetDateTime periodStart
     );
 
+    List<Shift>
+    findAllByBusiness_IdAndEmployee_IdAndStatusAndStartsAtBetweenOrderByStartsAtAsc(
+            Long businessId,
+            Long employeeId,
+            ShiftStatus status,
+            OffsetDateTime from,
+            OffsetDateTime to
+    );
+
     boolean
     existsByEmployee_IdAndStartsAtLessThanAndEndsAtGreaterThanAndStatusNot(
             Long employeeId,
