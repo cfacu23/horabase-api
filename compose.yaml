@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: horabase
       POSTGRES_USER: horabase
-      POSTGRES_PASSWORD: horabase123
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     ports:
       - "5432:5432"
     volumes:
