@@ -1,6 +1,7 @@
 package com.horabase.api.shift;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -13,6 +14,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             Long businessId
     );
 
+    @EntityGraph(attributePaths = {"employee", "sector"})
     List<Shift>
     findAllByBusiness_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
             Long businessId,
@@ -20,6 +22,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             OffsetDateTime periodStart
     );
 
+    @EntityGraph(attributePaths = {"employee", "sector"})
     List<Shift>
     findAllByBusiness_IdAndEmployee_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
             Long businessId,
@@ -28,6 +31,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             OffsetDateTime periodStart
     );
 
+    @EntityGraph(attributePaths = {"employee", "sector"})
     List<Shift>
     findAllByBusiness_IdAndSector_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
             Long businessId,
@@ -36,6 +40,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             OffsetDateTime periodStart
     );
 
+    @EntityGraph(attributePaths = {"employee", "sector"})
     List<Shift>
     findAllByBusiness_IdAndEmployee_IdAndSector_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
             Long businessId,
@@ -45,6 +50,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             OffsetDateTime periodStart
     );
 
+    @EntityGraph(attributePaths = {"employee", "sector"})
     List<Shift>
     findAllByBusiness_IdAndEmployee_IdAndStatusAndStartsAtBetweenOrderByStartsAtAsc(
             Long businessId,

@@ -1,6 +1,8 @@
 package com.horabase.api.account;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 import java.util.List;
@@ -26,6 +28,20 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     boolean existsByIdAndActiveTrueAndBusiness_IdAndBusiness_ActiveTrue(
             Long accountId,
             Long businessId
+    );
+
+    @Query("""
+            select a.active as accountActive,
+                   b.active as businessActive,
+                   a.mustChangePassword as mustChangePassword
+            from Account a
+            join a.business b
+            where a.id = :accountId
+              and b.id = :businessId
+            """)
+    Optional<AccountAccessState> findAccessState(
+            @Param("accountId") Long accountId,
+            @Param("businessId") Long businessId
     );
 
     boolean existsByBusiness_IdAndDocument(

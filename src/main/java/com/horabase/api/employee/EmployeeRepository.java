@@ -1,6 +1,7 @@
 package com.horabase.api.employee;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,10 +13,12 @@ import java.util.Optional;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
+    @EntityGraph(attributePaths = {"account", "sector"})
     List<Employee> findAllByBusiness_IdOrderByLastNameAscFirstNameAsc(
             Long businessId
     );
 
+    @EntityGraph(attributePaths = {"account", "sector"})
     Optional<Employee> findByIdAndBusiness_Id(
             Long employeeId,
             Long businessId
@@ -33,6 +36,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             @Param("businessId") Long businessId
     );
 
+    @EntityGraph(attributePaths = {"account", "sector", "business"})
     Optional<Employee> findByAccount_Id(Long accountId);
 
     boolean existsByAccount_Id(Long accountId);
