@@ -46,7 +46,6 @@ public class JwtService {
                 .expiresAt(expiresAt)
                 .subject(account.getId().toString())
                 .claim("businessId", account.getBusiness().getId())
-                .claim("employeeId", employeeId)
                 .claim("document", account.getDocument())
                 .claim("role", account.getRole().name());
 
