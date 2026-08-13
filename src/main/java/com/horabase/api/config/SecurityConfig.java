@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import com.horabase.api.terminal.TerminalAuthenticationFilter;
 
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.SecretKey;
@@ -101,6 +102,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
             ActiveAccountFilter activeAccountFilter,
+            TerminalAuthenticationFilter terminalAuthenticationFilter,
             JsonMapper jsonMapper
     ) throws Exception {
         return http
@@ -154,6 +156,10 @@ public class SecurityConfig {
                 )
                 .addFilterAfter(
                         activeAccountFilter,
+                        BearerTokenAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        terminalAuthenticationFilter,
                         BearerTokenAuthenticationFilter.class
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
