@@ -45,13 +45,17 @@ public class ShiftController {
             OffsetDateTime to,
 
             @RequestParam(required = false)
-            Long employeeId
+            Long employeeId,
+
+            @RequestParam(required = false)
+            Long sectorId
     ) {
         return shiftService.findAllByPeriod(
                 businessId,
                 from,
                 to,
-                employeeId
+                employeeId,
+                sectorId
         );
     }
 

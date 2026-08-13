@@ -36,4 +36,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByAccount_Id(Long accountId);
 
     boolean existsByAccount_Id(Long accountId);
+
+    long countByBusiness_IdAndActiveTrue(Long businessId);
 }

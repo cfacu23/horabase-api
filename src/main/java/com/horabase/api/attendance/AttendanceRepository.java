@@ -41,7 +41,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             left join fetch a.shift s
             where a.business.id = :businessId
               and a.checkInAt < :to
-              and coalesce(a.checkOutAt, a.checkInAt) >= :from
+              and (a.checkOutAt is null or a.checkOutAt >= :from)
               and (:employeeId is null or e.id = :employeeId)
               and (:status is null or a.status = :status)
             order by a.checkInAt asc
@@ -52,5 +52,10 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             @Param("to") OffsetDateTime to,
             @Param("employeeId") Long employeeId,
             @Param("status") AttendanceStatus status
+    );
+
+    long countByBusiness_IdAndStatus(
+            Long businessId,
+            AttendanceStatus status
     );
 }

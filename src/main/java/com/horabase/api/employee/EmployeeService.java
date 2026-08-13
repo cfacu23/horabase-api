@@ -157,6 +157,16 @@ public class EmployeeService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public EmployeeResponse findByAccountId(Long accountId) {
+        return employeeRepository.findByAccount_Id(accountId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "La cuenta no est\u00e1 vinculada a un empleado"
+                ));
+    }
+
     @Transactional
     public EmployeeResponse update(
             Long businessId,

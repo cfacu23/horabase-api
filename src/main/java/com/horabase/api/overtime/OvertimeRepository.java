@@ -12,4 +12,5 @@ public interface OvertimeRepository extends JpaRepository<OvertimeRecord, Long> 
             Long businessId, LocalDate from, LocalDate to);
     List<OvertimeRecord> findAllByBusiness_IdAndEmployee_IdAndWorkDateBetweenOrderByWorkDateDesc(
             Long businessId, Long employeeId, LocalDate from, LocalDate to);
+    long countByBusiness_IdAndStatus(Long businessId, OvertimeStatus status);
 }

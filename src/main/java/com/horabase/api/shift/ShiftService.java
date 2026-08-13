@@ -92,27 +92,53 @@ public class ShiftService {
             OffsetDateTime to,
             Long employeeId
     ) {
+        return findAllByPeriod(businessId, from, to, employeeId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShiftResponse> findAllByPeriod(
+            Long businessId,
+            OffsetDateTime from,
+            OffsetDateTime to,
+            Long employeeId,
+            Long sectorId
+    ) {
         findBusinessById(businessId);
         validateSearchPeriod(from, to);
 
+        if (employeeId != null) {
+            findEmployeeById(businessId, employeeId);
+        }
+        if (sectorId != null) {
+            findSectorById(businessId, sectorId);
+        }
+
         List<Shift> shifts;
 
-        if (employeeId == null) {
+        if (employeeId == null && sectorId == null) {
             shifts = shiftRepository
                     .findAllByBusiness_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
                             businessId,
                             to,
                             from
                     );
-        } else {
-            findEmployeeById(businessId, employeeId);
-
+        } else if (employeeId != null && sectorId == null) {
             shifts = shiftRepository
                     .findAllByBusiness_IdAndEmployee_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
                             businessId,
                             employeeId,
                             to,
                             from
+                    );
+        } else if (employeeId == null) {
+            shifts = shiftRepository
+                    .findAllByBusiness_IdAndSector_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
+                            businessId, sectorId, to, from
+                    );
+        } else {
+            shifts = shiftRepository
+                    .findAllByBusiness_IdAndEmployee_IdAndSector_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
+                            businessId, employeeId, sectorId, to, from
                     );
         }
 

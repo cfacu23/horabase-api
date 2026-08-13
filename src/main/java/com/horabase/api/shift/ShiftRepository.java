@@ -29,6 +29,23 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     );
 
     List<Shift>
+    findAllByBusiness_IdAndSector_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
+            Long businessId,
+            Long sectorId,
+            OffsetDateTime periodEnd,
+            OffsetDateTime periodStart
+    );
+
+    List<Shift>
+    findAllByBusiness_IdAndEmployee_IdAndSector_IdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
+            Long businessId,
+            Long employeeId,
+            Long sectorId,
+            OffsetDateTime periodEnd,
+            OffsetDateTime periodStart
+    );
+
+    List<Shift>
     findAllByBusiness_IdAndEmployee_IdAndStatusAndStartsAtBetweenOrderByStartsAtAsc(
             Long businessId,
             Long employeeId,
@@ -52,5 +69,12 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             OffsetDateTime newShiftStart,
             ShiftStatus excludedStatus,
             Long shiftId
+    );
+
+    long countByBusiness_IdAndStatusAndStartsAtBetween(
+            Long businessId,
+            ShiftStatus status,
+            OffsetDateTime from,
+            OffsetDateTime to
     );
 }
