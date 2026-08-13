@@ -5,12 +5,14 @@ import com.horabase.api.sector.dto.SectorResponse;
 import com.horabase.api.sector.dto.UpdateSectorRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/businesses/{businessId}/sectors")
+@PreAuthorize("@businessSecurity.canAccess(authentication, #businessId)")
 public class SectorController {
 
     private final SectorService sectorService;

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
@@ -16,6 +17,7 @@ import java.util.List;
         name = "Asistencias",
         description = "Consulta, alta manual, corrección y anulación de asistencias"
 )
+@PreAuthorize("@businessSecurity.canAccess(authentication, #businessId)")
 public class AttendanceController {
 
     private final AttendanceService attendanceService;

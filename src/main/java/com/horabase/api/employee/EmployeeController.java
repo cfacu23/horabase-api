@@ -5,12 +5,14 @@ import com.horabase.api.employee.dto.EmployeeResponse;
 import com.horabase.api.employee.dto.UpdateEmployeeRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/businesses/{businessId}/employees")
+@PreAuthorize("@businessSecurity.canAccess(authentication, #businessId)")
 public class EmployeeController {
 
     private final EmployeeService employeeService;

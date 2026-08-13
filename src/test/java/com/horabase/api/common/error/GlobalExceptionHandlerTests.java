@@ -21,13 +21,13 @@ class GlobalExceptionHandlerTests {
 
     @Test
     void returnsFieldErrorsForInvalidRequest() throws Exception {
-        mockMvc.perform(post("/api/businesses")
+        mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "name": "",
-                                  "taxId": "",
-                                  "email": "not-an-email"
+                                  "businessId": -1,
+                                  "document": "",
+                                  "password": ""
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -35,23 +35,31 @@ class GlobalExceptionHandlerTests {
                 .andExpect(jsonPath("$.message")
                         .value("Error de validación"))
                 .andExpect(jsonPath("$.path")
-                        .value("/api/businesses"))
-                .andExpect(jsonPath("$.errors.name").exists())
-                .andExpect(jsonPath("$.errors.taxId").exists())
-                .andExpect(jsonPath("$.errors.email").exists())
+                        .value("/api/auth/login"))
+                .andExpect(jsonPath("$.errors.businessId").exists())
+                .andExpect(jsonPath("$.errors.document").exists())
+                .andExpect(jsonPath("$.errors.password").exists())
                 .andExpect(jsonPath("$.trace").doesNotExist());
     }
 
     @Test
     void returnsCleanResponseForBusinessError() throws Exception {
-        mockMvc.perform(get("/api/businesses/{id}", 999999))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("Not Found"))
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "businessId": 999999,
+                                  "document": "12345678",
+                                  "password": "wrong-password"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
                 .andExpect(jsonPath("$.message")
-                        .value("No se encontró el comercio"))
+                        .value("Credenciales inválidas"))
                 .andExpect(jsonPath("$.path")
-                        .value("/api/businesses/999999"))
+                        .value("/api/auth/login"))
                 .andExpect(jsonPath("$.trace").doesNotExist());
     }
 }

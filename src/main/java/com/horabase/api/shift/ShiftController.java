@@ -6,6 +6,7 @@ import com.horabase.api.shift.dto.UpdateShiftRequest;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
@@ -13,6 +14,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/businesses/{businessId}/shifts")
+@PreAuthorize("@businessSecurity.canAccess(authentication, #businessId)")
 public class ShiftController {
 
     private final ShiftService shiftService;
