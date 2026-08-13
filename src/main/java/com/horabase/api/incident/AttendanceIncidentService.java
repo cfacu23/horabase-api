@@ -1,13 +1,208 @@
 package com.horabase.api.incident;
-import com.horabase.api.attendance.*; import com.horabase.api.business.*; import com.horabase.api.employee.*; import com.horabase.api.incident.dto.*; import com.horabase.api.shift.*;
-import org.springframework.http.HttpStatus; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import org.springframework.web.server.ResponseStatusException;
-import java.time.LocalDate; import java.util.*;
-@Service public class AttendanceIncidentService{
- private final AttendanceIncidentRepository repo; private final BusinessRepository businesses; private final EmployeeRepository employees; private final ShiftRepository shifts; private final AttendanceRepository attendances;
- public AttendanceIncidentService(AttendanceIncidentRepository r,BusinessRepository b,EmployeeRepository e,ShiftRepository s,AttendanceRepository a){repo=r;businesses=b;employees=e;shifts=s;attendances=a;}
- @Transactional public IncidentResponse create(Long bid,IncidentRequest q){Business b=businesses.findById(bid).orElseThrow(()->notFound("comercio")); Employee e=employees.findByIdAndBusiness_Id(q.employeeId(),bid).orElseThrow(()->notFound("empleado")); Shift s=q.shiftId()==null?null:shifts.findByIdAndBusiness_Id(q.shiftId(),bid).orElseThrow(()->notFound("turno")); Attendance a=q.attendanceId()==null?null:attendances.findDetailedByIdAndBusinessId(q.attendanceId(),bid).orElseThrow(()->notFound("asistencia")); if(s!=null&&!s.getEmployee().getId().equals(e.getId())||a!=null&&!a.getEmployee().getId().equals(e.getId()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"El turno o asistencia no pertenece al empleado"); AttendanceIncident i=new AttendanceIncident();i.setBusiness(b);i.setEmployee(e);i.setShift(s);i.setAttendance(a);i.setIncidentDate(q.incidentDate());i.setType(q.type());i.setDetectedMinutes(q.detectedMinutes());i.setNotes(norm(q.notes()));i.setStatus(IncidentStatus.DETECTED);return out(repo.save(i));}
- @Transactional(readOnly=true) public List<IncidentResponse> list(Long bid,LocalDate from,LocalDate to,Long eid){businesses.findById(bid).orElseThrow(()->notFound("comercio"));if(to.isBefore(from))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"El período no es válido");return(eid==null?repo.findAllByBusiness_IdAndIncidentDateBetweenOrderByIncidentDateDesc(bid,from,to):repo.findAllByBusiness_IdAndEmployee_IdAndIncidentDateBetweenOrderByIncidentDateDesc(bid,eid,from,to)).stream().map(this::out).toList();}
- @Transactional public IncidentResponse resolve(Long bid,Long id,ResolveIncidentRequest q){if(q.status()==IncidentStatus.DETECTED)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"El estado de resolución no es válido");AttendanceIncident i=repo.findByIdAndBusiness_Id(id,bid).orElseThrow(()->notFound("incidencia"));i.setStatus(q.status());String n=norm(q.notes());if(n!=null)i.setNotes(i.getNotes()==null?n:i.getNotes()+System.lineSeparator()+n);return out(repo.save(i));}
- private ResponseStatusException notFound(String x){return new ResponseStatusException(HttpStatus.NOT_FOUND,"No se encontró el "+x);} private String norm(String x){return x==null||x.isBlank()?null:x.trim();}
- private IncidentResponse out(AttendanceIncident i){Employee e=i.getEmployee();return new IncidentResponse(i.getId(),i.getBusiness().getId(),e.getId(),e.getFirstName()+" "+e.getLastName(),i.getShift()==null?null:i.getShift().getId(),i.getAttendance()==null?null:i.getAttendance().getId(),i.getIncidentDate(),i.getType(),i.getStatus(),i.getDetectedMinutes(),i.getNotes(),i.getCreatedAt(),i.getUpdatedAt());}
+
+import com.horabase.api.attendance.Attendance;
+import com.horabase.api.attendance.AttendanceRepository;
+import com.horabase.api.business.Business;
+import com.horabase.api.business.BusinessRepository;
+import com.horabase.api.employee.Employee;
+import com.horabase.api.employee.EmployeeRepository;
+import com.horabase.api.incident.dto.IncidentRequest;
+import com.horabase.api.incident.dto.IncidentResponse;
+import com.horabase.api.incident.dto.ResolveIncidentRequest;
+import com.horabase.api.shift.Shift;
+import com.horabase.api.shift.ShiftRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@Service
+public class AttendanceIncidentService {
+
+    private final AttendanceIncidentRepository repository;
+    private final BusinessRepository businesses;
+    private final EmployeeRepository employees;
+    private final ShiftRepository shifts;
+    private final AttendanceRepository attendances;
+
+    public AttendanceIncidentService(
+            AttendanceIncidentRepository repository,
+            BusinessRepository businesses,
+            EmployeeRepository employees,
+            ShiftRepository shifts,
+            AttendanceRepository attendances
+    ) {
+        this.repository = repository;
+        this.businesses = businesses;
+        this.employees = employees;
+        this.shifts = shifts;
+        this.attendances = attendances;
+    }
+
+    @Transactional
+    public IncidentResponse create(
+            Long businessId,
+            IncidentRequest request
+    ) {
+        Business business = findBusiness(businessId);
+        Employee employee = findEmployee(businessId, request.employeeId());
+        Shift shift = findOptionalShift(businessId, request.shiftId());
+        Attendance attendance = findOptionalAttendance(
+                businessId, request.attendanceId()
+        );
+
+        validateOwnership(employee, shift, attendance);
+
+        AttendanceIncident incident = new AttendanceIncident();
+        incident.setBusiness(business);
+        incident.setEmployee(employee);
+        incident.setShift(shift);
+        incident.setAttendance(attendance);
+        incident.setIncidentDate(request.incidentDate());
+        incident.setType(request.type());
+        incident.setDetectedMinutes(request.detectedMinutes());
+        incident.setNotes(normalize(request.notes()));
+        incident.setStatus(IncidentStatus.DETECTED);
+
+        return toResponse(repository.save(incident));
+    }
+
+    @Transactional(readOnly = true)
+    public List<IncidentResponse> list(
+            Long businessId,
+            LocalDate from,
+            LocalDate to,
+            Long employeeId
+    ) {
+        findBusiness(businessId);
+        if (to.isBefore(from)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El período no es válido"
+            );
+        }
+
+        List<AttendanceIncident> result;
+        if (employeeId == null) {
+            result = repository
+                    .findAllByBusiness_IdAndIncidentDateBetweenOrderByIncidentDateDesc(
+                            businessId, from, to
+                    );
+        } else {
+            findEmployee(businessId, employeeId);
+            result = repository
+                    .findAllByBusiness_IdAndEmployee_IdAndIncidentDateBetweenOrderByIncidentDateDesc(
+                            businessId, employeeId, from, to
+                    );
+        }
+        return result.stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public IncidentResponse resolve(
+            Long businessId,
+            Long incidentId,
+            ResolveIncidentRequest request
+    ) {
+        if (request.status() == IncidentStatus.DETECTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El estado de resolución no es válido"
+            );
+        }
+
+        AttendanceIncident incident = repository
+                .findByIdAndBusiness_Id(incidentId, businessId)
+                .orElseThrow(() -> notFound("incidencia"));
+        incident.setStatus(request.status());
+
+        String note = normalize(request.notes());
+        if (note != null) {
+            incident.setNotes(incident.getNotes() == null
+                    ? note
+                    : incident.getNotes() + System.lineSeparator() + note);
+        }
+        return toResponse(repository.save(incident));
+    }
+
+    private Business findBusiness(Long businessId) {
+        return businesses.findById(businessId)
+                .orElseThrow(() -> notFound("comercio"));
+    }
+
+    private Employee findEmployee(Long businessId, Long employeeId) {
+        return employees.findByIdAndBusiness_Id(employeeId, businessId)
+                .orElseThrow(() -> notFound("empleado"));
+    }
+
+    private Shift findOptionalShift(Long businessId, Long shiftId) {
+        if (shiftId == null) {
+            return null;
+        }
+        return shifts.findByIdAndBusiness_Id(shiftId, businessId)
+                .orElseThrow(() -> notFound("turno"));
+    }
+
+    private Attendance findOptionalAttendance(
+            Long businessId,
+            Long attendanceId
+    ) {
+        if (attendanceId == null) {
+            return null;
+        }
+        return attendances
+                .findDetailedByIdAndBusinessId(attendanceId, businessId)
+                .orElseThrow(() -> notFound("asistencia"));
+    }
+
+    private void validateOwnership(
+            Employee employee,
+            Shift shift,
+            Attendance attendance
+    ) {
+        boolean invalidShift = shift != null
+                && !shift.getEmployee().getId().equals(employee.getId());
+        boolean invalidAttendance = attendance != null
+                && !attendance.getEmployee().getId().equals(employee.getId());
+        if (invalidShift || invalidAttendance) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El turno o la asistencia no pertenece al empleado"
+            );
+        }
+    }
+
+    private ResponseStatusException notFound(String resource) {
+        return new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "No se encontró el " + resource
+        );
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private IncidentResponse toResponse(AttendanceIncident incident) {
+        Employee employee = incident.getEmployee();
+        return new IncidentResponse(
+                incident.getId(),
+                incident.getBusiness().getId(),
+                employee.getId(),
+                employee.getFirstName() + " " + employee.getLastName(),
+                incident.getShift() == null ? null : incident.getShift().getId(),
+                incident.getAttendance() == null
+                        ? null : incident.getAttendance().getId(),
+                incident.getIncidentDate(),
+                incident.getType(),
+                incident.getStatus(),
+                incident.getDetectedMinutes(),
+                incident.getNotes(),
+                incident.getCreatedAt(),
+                incident.getUpdatedAt()
+        );
+    }
 }
