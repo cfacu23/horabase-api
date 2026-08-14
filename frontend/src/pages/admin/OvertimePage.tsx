@@ -1,0 +1,27 @@
+import { BadgeDollarSign, Check, Plus, X } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
+import { useAuth } from '../../auth/AuthContext'
+import { Empty, Loading, Notice } from '../../components/Feedback'
+import { Modal } from '../../components/Modal'
+import { PageHeader } from '../../components/PageHeader'
+import { StatusBadge } from '../../components/StatusBadge'
+import { useApiData } from '../../hooks/useApi'
+import { api } from '../../lib/api'
+import { formatDate, money, minutes } from '../../lib/format'
+import type { Employee, Overtime } from '../../types'
+
+export function OvertimePage() {
+  const { token, user } = useAuth(); const businessId = user.businessId; const [modal, setModal] = useState<'create' | 'approve' | 'reject' | 'pay' | null>(null); const [selected, setSelected] = useState<Overtime | null>(null); const [error, setError] = useState('')
+  const to = new Date(); const from = new Date(); from.setMonth(from.getMonth() - 3)
+  const records = useApiData<Overtime[]>(`/api/businesses/${businessId}/overtime?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`, []); const employees = useApiData<Employee[]>(`/api/businesses/${businessId}/employees`, [])
+  function open(kind: typeof modal, item: Overtime | null = null) { setSelected(item); setModal(kind); setError('') }
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(''); const values = new FormData(event.currentTarget); let path = `/api/businesses/${businessId}/overtime`; let body: unknown; const method = 'POST'
+    if (modal === 'create') body = { employeeId: Number(values.get('employeeId')), workDate: values.get('workDate'), detectedMinutes: Number(values.get('detectedMinutes')), notes: values.get('notes') || null }
+    if (modal === 'approve') { path += `/${selected?.id}/approve`; body = { approvedMinutes: Number(values.get('approvedMinutes')), notes: values.get('notes') || null } }
+    if (modal === 'reject') { path += `/${selected?.id}/reject`; body = String(values.get('notes') || '') }
+    if (modal === 'pay') { path += `/${selected?.id}/pay`; body = { paidAmount: Number(values.get('paidAmount')), paidAt: new Date().toISOString(), notes: values.get('notes') || null } }
+    try { await api(path, { method, body: JSON.stringify(body), headers: modal === 'reject' ? { 'Content-Type': 'text/plain' } : undefined }, token); setModal(null); await records.reload() } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo completar la operación') }
+  }
+  return <div className="page"><PageHeader eyebrow="Compensaciones" title="Horas extra" description="Detectá, aprobá y registrá pagos fuera de horario." actions={<button className="button primary" onClick={() => open('create')}><Plus size={18} /> Registrar</button>} />{error && <Notice message={error} />}{records.loading ? <Loading /> : records.data.length === 0 ? <Empty title="Sin horas extra" text="Los registros del último trimestre aparecerán acá." /> : <div className="table-wrap"><table><thead><tr><th>Empleado</th><th>Fecha</th><th>Detectado</th><th>Aprobado</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>{records.data.map((item) => <tr key={item.id}><td><strong>{item.employeeName}</strong></td><td>{formatDate(item.workDate)}</td><td>{minutes(item.detectedMinutes)}</td><td>{minutes(item.approvedMinutes)}</td><td>{money(item.status === 'PAID' ? item.paidAmount : item.approvedAmount)}</td><td><StatusBadge status={item.status} /></td><td className="row-actions">{item.status === 'DETECTED' && <><button className="icon-button success" onClick={() => open('approve', item)} title="Aprobar"><Check size={17} /></button><button className="icon-button danger-text" onClick={() => open('reject', item)} title="Rechazar"><X size={17} /></button></>}{item.status === 'APPROVED' && <button className="icon-button" onClick={() => open('pay', item)} title="Registrar pago"><BadgeDollarSign size={18} /></button>}</td></tr>)}</tbody></table></div>}{modal && <Modal title={{ create: 'Registrar horas extra', approve: 'Aprobar horas extra', reject: 'Rechazar horas extra', pay: 'Registrar pago' }[modal]} onClose={() => setModal(null)}><form className="form-grid" onSubmit={submit}>{error && <div className="full"><Notice message={error} /></div>}{modal === 'create' && <><label className="full">Empleado<select name="employeeId" required>{employees.data.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.firstName} {item.lastName}</option>)}</select></label><label>Fecha<input name="workDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label><label>Minutos detectados<input name="detectedMinutes" type="number" min="1" required /></label></>}{modal === 'approve' && <label className="full">Minutos aprobados<input name="approvedMinutes" type="number" min="1" defaultValue={selected?.detectedMinutes} required /></label>}{modal === 'pay' && <label className="full">Monto pagado<input name="paidAmount" type="number" min="0" step="0.01" defaultValue={selected?.approvedAmount} required /></label>}<label className="full">{modal === 'reject' ? 'Motivo' : 'Notas'}<textarea name="notes" rows={3} required={modal === 'reject'} /></label><div className="modal-actions full"><button type="button" className="button ghost" onClick={() => setModal(null)}>Cancelar</button><button className="button primary">Confirmar</button></div></form></Modal>}</div>
+}
