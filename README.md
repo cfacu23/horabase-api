@@ -1,146 +1,219 @@
-# HoraBase API
+# HoraBase
 
-HoraBase es el backend REST de una plataforma multi-comercio para gestionar
-empleados, sectores, turnos, asistencias, incidencias, solicitudes y horas
-extra. Está pensado para administradores web, empleados desde dispositivos
-móviles y terminales físicas de marcación.
+HoraBase es una aplicación web multi-comercio para gestionar personas, turnos y asistencia. Incluye un panel administrativo, un portal móvil para empleados y un modo terminal (kiosk) para registrar entradas y salidas.
 
-## Arquitectura y tecnologías
+## Arquitectura
 
-- Java 21 y Spring Boot 4.1.
-- Spring MVC, Jakarta Validation y manejo global de errores.
-- Spring Data JPA con PostgreSQL 16.
-- Spring Security stateless con JWT HS256 y roles `ADMIN` / `EMPLOYEE`.
-- Credenciales cifradas con `PasswordEncoder`; secretos de terminal con BCrypt.
-- OpenAPI/Swagger UI.
-- Maven Wrapper, Docker Compose y H2 únicamente para tests.
+- Backend: Java 21, Spring Boot 4, Spring Security, JWT y JPA.
+- Base de datos: PostgreSQL 16. H2 se usa únicamente en tests unitarios/de integración.
+- Frontend: React 19, TypeScript, Vite y CSS responsive.
+- Ejecución: Docker Compose con PostgreSQL, API y Nginx para el frontend.
+- API: REST documentada con OpenAPI/Swagger.
 
-El código se organiza por módulo de negocio. Cada paquete contiene entidad,
-repositorio, servicio, controlador y DTOs cuando corresponde. Todas las
-operaciones administrativas validan el `businessId` del JWT y todos los
-recursos relacionados se vuelven a comprobar contra el comercio.
+La API es stateless. Los endpoints administrativos verifican rol `ADMIN` y el `businessId` firmado en el JWT; los empleados consumen `/api/me/**`, sin poder elegir otro empleado o comercio. Las terminales usan credenciales propias cuyo secreto solo se muestra al crear o rotar el dispositivo.
 
 ## Requisitos
 
-- JDK 21.
-- Docker Desktop o una instancia PostgreSQL 16.
-- PowerShell en Windows, o una shell POSIX en Linux/macOS.
+Para la opción recomendada solo se necesita Docker Desktop con Compose. Para desarrollo sin contenedores se requiere además:
 
-## Inicio desde cero
+- JDK 21;
+- Node.js 22 o 24 y npm;
+- PostgreSQL 16;
+- PowerShell 5.1+ en Windows para el E2E incluido.
 
-1. Copiar `.env.example` a `.env` y sustituir todos los valores `replace-*`.
-2. Generar `JWT_SECRET` en Base64 con al menos 32 bytes, por ejemplo:
-   `openssl rand -base64 32`.
-3. Iniciar PostgreSQL: `docker compose --env-file .env up -d`.
-4. Exportar las variables del `.env` en la shell que ejecutará Java.
-5. Ejecutar `./mvnw spring-boot:run` o, en Windows,
-   `.\mvnw.cmd spring-boot:run`.
-6. Comprobar `GET http://localhost:8080/api/health`.
+## Inicio rápido con Docker
 
-Para crear el primer comercio y administrador, establecer temporalmente
-`HORABASE_BOOTSTRAP_ENABLED=true` y completar las demás variables
-`HORABASE_BOOTSTRAP_*`. El inicializador solo actúa cuando no existe ningún
-comercio ni cuenta. Después del primer arranque debe volver a `false`.
+1. Copiar `.env.example` como `.env`.
+2. Reemplazar `DB_PASSWORD` y generar `JWT_SECRET` en Base64 con al menos 32 bytes:
 
-La configuración mantiene `spring.jpa.hibernate.ddl-auto=update` durante esta
-fase. Antes de producción se debe reemplazar por migraciones versionadas con
-Flyway o Liquibase.
+   ```bash
+   openssl rand -base64 32
+   ```
+
+3. Para una base nueva, cambiar temporalmente `HORABASE_BOOTSTRAP_ENABLED=true`.
+4. Levantar todo:
+
+   ```bash
+   docker compose up --build -d
+   docker compose ps
+   ```
+
+5. Abrir:
+
+   - Aplicación: `http://localhost:3000`
+   - Kiosk: `http://localhost:3000/kiosk`
+   - API: `http://localhost:8080`
+   - Salud: `http://localhost:8080/api/health`
+   - Swagger: `http://localhost:8080/swagger-ui.html` cuando `SWAGGER_ENABLED=true`
+
+Después del primer arranque exitoso, volver a dejar `HORABASE_BOOTSTRAP_ENABLED=false`. El inicializador también se protege comprobando que la base no contenga comercios ni cuentas.
+
+Para detener servicios sin borrar datos:
+
+```bash
+docker compose down
+```
+
+No usar `docker compose down -v` salvo que se quiera eliminar deliberadamente toda la base local.
+
+## Demo opcional
+
+`.env.example` contiene datos de ejemplo seguros para desarrollo:
+
+- Comercio: `HoraBase Demo`
+- Documento administrador: `45678901`
+- Contraseña temporal: `AdminDemo123!`
+
+La demo solo se crea si se activa `HORABASE_BOOTSTRAP_ENABLED=true` sobre una base vacía. En el primer login se exige reemplazar la contraseña temporal. Nunca debe habilitarse el bootstrap ni conservarse esa contraseña en producción.
+
+Para poblar y comprobar automáticamente sector, empleado, turno, terminal, asistencia, incidencia, horas extra, solicitud y aislamiento multi-comercio sobre un entorno demo descartable:
+
+```powershell
+.\scripts\e2e.ps1
+```
+
+El E2E cambia las contraseñas demo a valores de prueba indicados en sus parámetros y crea registros; no debe ejecutarse sobre datos productivos.
+
+## Desarrollo local
+
+### Base y backend
+
+Configurar las variables de `.env` en la shell o IDE. Si PostgreSQL ya usa el puerto 5432, establecer por ejemplo `POSTGRES_PORT=55432` y ajustar `DB_URL=jdbc:postgresql://localhost:55432/horabase`.
+
+Para levantar solo PostgreSQL:
+
+```bash
+docker compose up -d postgres
+```
+
+Ejecutar la API:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+En Linux/macOS: `./mvnw spring-boot:run`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Vite abre `http://localhost:5173` y redirige `/api` y `/v3` a `VITE_DEV_API_URL` (por defecto `http://localhost:8080`). En la imagen Docker, Nginx usa el backend interno y el navegador conserva un único origen.
 
 ## Variables de entorno
 
-| Variable | Propósito |
+| Variable | Uso |
 | --- | --- |
-| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Conexión PostgreSQL |
-| `JWT_SECRET`, `JWT_ISSUER`, `JWT_EXPIRATION_MINUTES` | Firma y vigencia JWT |
-| `ATTENDANCE_SHIFT_MATCH_WINDOW_MINUTES` | Ventana para asociar turno al fichaje |
-| `PASSWORD_RESET_EXPIRATION_MINUTES` | Vigencia del token de recuperación |
-| `PASSWORD_RESET_BASE_URL` | URL del futuro frontend de recuperación |
-| `MAIL_FROM`, `SMTP_*` | Transporte de correo |
-| `HORABASE_BOOTSTRAP_*` | Alta inicial opcional y de un solo uso |
+| `DB_NAME`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | PostgreSQL |
+| `POSTGRES_PORT`, `API_PORT`, `FRONTEND_PORT` | Puertos publicados por Compose |
+| `JWT_SECRET`, `JWT_ISSUER`, `JWT_EXPIRATION_MINUTES` | Firma y vigencia de tokens |
+| `CORS_ALLOWED_ORIGINS` | Lista exacta de orígenes separados por coma |
+| `SWAGGER_ENABLED` | Habilita documentación en el perfil `prod` |
+| `HORABASE_BOOTSTRAP_*` | Comercio y admin iniciales, solo base vacía |
+| `ATTENDANCE_SHIFT_MATCH_WINDOW_MINUTES` | Ventana de asociación automática de turnos |
+| `PASSWORD_RESET_*`, `MAIL_FROM`, `SMTP_*` | Recuperación y correo |
+| `SPRING_PROFILES_ACTIVE` | Perfil de Spring; Compose usa `prod` |
 
-No se deben versionar `.env`, contraseñas, API keys ni secretos reales.
+No se versionan `.env`, secretos, contraseñas reales ni archivos de configuración local. En producción, `CORS_ALLOWED_ORIGINS` debe contener dominios HTTPS explícitos; no se recomienda `*`.
 
-## Autenticación
+## Login y roles
 
-`POST /api/auth/login` recibe documento, contraseña y `businessId` opcional.
-Cuando un documento existe en más de un comercio, `businessId` es obligatorio.
-La respuesta incluye el Bearer token, expiración, rol, comercio, empleado y
-`mustChangePassword`.
+`POST /api/auth/login` recibe documento, contraseña y un `businessId` opcional. Si el mismo documento existe en más de un comercio, el identificador del comercio pasa a ser obligatorio.
 
-- `POST /api/auth/change-password`: valida la contraseña actual.
-- `POST /api/auth/forgot-password`: respuesta neutra para evitar enumeración.
-- `POST /api/auth/reset-password`: consume una sola vez un token con vencimiento.
+- `ADMIN`: dashboard, empleados, perfiles, sectores, calendario/turnos, asistencias, incidencias, horas extra, solicitudes y terminales del propio comercio.
+- `EMPLOYEE`: perfil, calendario, asistencias, incidencias, horas extra y solicitudes propias mediante `/api/me/**`.
+- Terminal: no usa JWT; requiere `X-Terminal-Id` y `X-Terminal-Secret` en `/api/terminal/businesses/{businessId}/check-in|check-out`.
 
-Las credenciales desactivadas se rechazan incluso cuando el JWT todavía no
-venció. Swagger permite autorizar llamadas con `Bearer <token>`.
+Una cuenta con `mustChangePassword=true` solo puede invocar el cambio de contraseña hasta completar ese paso. Las cuentas, comercios o terminales inactivas se rechazan incluso si una credencial anterior todavía existe.
 
-## Terminales físicas
+## Kiosk
 
-Un administrador registra dispositivos en
-`/api/businesses/{businessId}/terminals`. El secreto solo se devuelve al crear
-o rotar y en base de datos se conserva su hash BCrypt.
+La ruta pública es `/kiosk`. El engranaje permite guardar en el almacenamiento local del dispositivo:
 
-Los fichajes de terminal requieren:
+- ID del comercio;
+- identificador de terminal;
+- secreto generado por el administrador.
 
-- `X-Terminal-Id: <identificador>`
-- `X-Terminal-Secret: <secreto>`
-
-El filtro verifica dispositivo activo, comercio, secreto y coincidencia con el
-`businessId` de la ruta; además actualiza `lastSeenAt`.
+El secreto no vuelve a mostrarse en el panel administrativo. Si se pierde o compromete, debe rotarse; el valor anterior queda invalidado. El kiosk solo permite identificar al empleado y marcar entrada/salida, sin exponer navegación administrativa.
 
 ## Endpoints principales
 
-Todos los endpoints `/api/businesses/{businessId}/...` requieren rol `ADMIN`
-y pertenencia al comercio.
-
-| Área | Endpoints |
+| Área | Ruta |
 | --- | --- |
-| Comercios | `GET/PUT /api/businesses...` (solo el comercio del JWT) |
+| Autenticación | `/api/auth/login`, `/change-password`, `/forgot-password`, `/reset-password` |
+| Dashboard | `/api/businesses/{businessId}/dashboard` |
+| Empleados y perfiles | `/api/businesses/{businessId}/employees` |
 | Sectores | `/api/businesses/{businessId}/sectors` |
-| Empleados | `/api/businesses/{businessId}/employees` |
-| Perfil integral | `GET /api/businesses/{businessId}/employees/{employeeId}/profile` |
-| Turnos/calendario | `/api/businesses/{businessId}/shifts?from=&to=&employeeId=&sectorId=` |
-| Asistencias | `/api/businesses/{businessId}/attendances` y acciones de corrección/anulación |
-| Terminal | `POST /api/terminal/businesses/{businessId}/check-in` y `check-out` |
+| Turnos | `/api/businesses/{businessId}/shifts` |
+| Asistencias | `/api/businesses/{businessId}/attendances` |
 | Incidencias | `/api/businesses/{businessId}/incidents` |
-| Horas extra | `/api/businesses/{businessId}/overtime` y acciones `approve`, `reject`, `pay` |
-| Solicitudes | `/api/businesses/{businessId}/requests` y acciones `approve`, `reject` |
-| Dashboard | `GET /api/businesses/{businessId}/dashboard` |
-| Empleado | `/api/me/profile`, `/calendar`, `/attendances`, `/incidents`, `/overtime`, `/requests` |
+| Horas extra | `/api/businesses/{businessId}/overtime` |
+| Solicitudes admin | `/api/businesses/{businessId}/requests` |
+| Portal empleado | `/api/me/profile`, `/calendar`, `/attendances`, `/incidents`, `/overtime`, `/requests` |
+| Terminales | `/api/businesses/{businessId}/terminals` |
+| Fichaje kiosk | `/api/terminal/businesses/{businessId}/check-in`, `/check-out` |
 
-Los intervalos con hora usan ISO-8601 con offset (`OffsetDateTime`) y las fechas
-sin hora usan `yyyy-MM-dd`. Las consultas de turnos detectan intersección con el
-período, por lo que incluyen correctamente turnos nocturnos.
+Las horas se transmiten como ISO-8601 con offset (`OffsetDateTime`) y las fechas como `yyyy-MM-dd`.
 
-## Swagger y errores
+## Tests y validación
 
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+Backend completo:
 
-Los errores usan una respuesta compacta con `timestamp`, `status`, `error`,
-`message`, `path` y, para validaciones, un mapa `errors`. Nunca se incluyen
-stack traces en la respuesta.
-
-## Tests y comandos Maven
-
-```text
-./mvnw test
-./mvnw clean verify
-./mvnw spring-boot:run
+```powershell
+.\mvnw.cmd clean verify
 ```
 
-En Windows reemplazar `./mvnw` por `.\mvnw.cmd`. Los tests usan H2 en modo de
-compatibilidad PostgreSQL y no requieren Docker.
+Frontend:
 
-## Flujo Git
+```bash
+cd frontend
+npm run lint
+npm run test
+npm run build
+```
 
-`dev` es la rama de integración. Cada módulo se desarrolla en una rama
-`feature/...`, se valida con tests y se integra en `dev`. `main` queda reservada
-para versiones preparadas para publicación.
+Compose:
 
-## Contrato para el futuro frontend
+```bash
+docker compose --env-file .env.example config
+docker compose up --build -d
+```
 
-La experiencia administrador consumirá dashboard, empleados/perfiles,
-calendario, asistencias, incidencias, solicitudes, horas extra, sectores y
-terminales. La experiencia empleado debe usar exclusivamente `/api/me/**`, de
-modo que el navegador nunca decide ni envía el identificador del empleado.
+Los tests cubren autenticación, JWT, contraseña inicial, roles, acceso cross-business, terminal, doble entrada, salida sin entrada, empleados, turnos, solicitudes, horas extra, dashboard y respuestas de error.
+
+## Estructura
+
+```text
+src/main/java/com/horabase/api/   Backend por módulos de negocio
+src/main/resources/              Configuración Spring
+src/test/                        Tests backend
+frontend/src/                    Aplicación React
+scripts/e2e.ps1                  Flujo real contra PostgreSQL/API
+compose.yaml                     Stack completo
+Dockerfile                       Imagen backend
+frontend/Dockerfile              Imagen frontend
+```
+
+## Deployment
+
+1. Usar contraseñas aleatorias y un `JWT_SECRET` exclusivo del entorno.
+2. Configurar HTTPS en el proxy o plataforma y orígenes CORS exactos.
+3. Mantener `HORABASE_BOOTSTRAP_ENABLED=false` y `SWAGGER_ENABLED=false`.
+4. Usar PostgreSQL administrado o respaldar el volumen periódicamente.
+5. Inyectar variables desde el gestor de secretos de la plataforma.
+6. Ejecutar los builds y tests antes de desplegar.
+
+Durante esta etapa Hibernate mantiene el esquema con `ddl-auto=update`, apropiado para el MVP y arranques limpios de Compose. Antes de una migración productiva con datos críticos se deben introducir migraciones versionadas (Flyway/Liquibase) y probar el plan de rollback.
+
+## Troubleshooting
+
+- Puerto ocupado: cambiar `POSTGRES_PORT`, `API_PORT` o `FRONTEND_PORT` en `.env`; no detener servicios ajenos.
+- API no inicia: comprobar `docker compose logs backend`, la salud de PostgreSQL y que `JWT_SECRET` sea Base64 de 32 bytes o más.
+- Login inicial no funciona: el bootstrap solo actúa sobre una base vacía; revisar `docker compose logs backend`.
+- Swagger devuelve 404: establecer `SWAGGER_ENABLED=true` y recrear backend.
+- Frontend no llega a la API: en desarrollo revisar `VITE_DEV_API_URL`; en Docker comprobar la salud de `backend` y `frontend`.
+- Terminal rechazada: verificar comercio, identificador, secreto y que tanto comercio como terminal estén activos.

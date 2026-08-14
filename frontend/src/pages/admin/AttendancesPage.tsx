@@ -1,5 +1,5 @@
 import { ClockArrowDown, ClockArrowUp, Plus } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { Empty, Loading, Notice } from '../../components/Feedback'
 import { Modal } from '../../components/Modal'
@@ -12,8 +12,8 @@ import type { Attendance, Employee } from '../../types'
 
 export function AttendancesPage() {
   const { token, user } = useAuth(); const businessId = user.businessId; const [days, setDays] = useState(30); const [modal, setModal] = useState<'create' | 'in' | 'out' | null>(null); const [selected, setSelected] = useState<Attendance | null>(null); const [error, setError] = useState('')
-  const to = new Date(); const from = new Date(); from.setDate(from.getDate() - days)
-  const attendances = useApiData<Attendance[]>(`/api/businesses/${businessId}/attendances?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, []); const employees = useApiData<Employee[]>(`/api/businesses/${businessId}/employees`, [])
+  const period = useMemo(() => { const to = new Date(); const from = new Date(); from.setDate(from.getDate() - days); return { from: from.toISOString(), to: to.toISOString() } }, [days])
+  const attendances = useApiData<Attendance[]>(`/api/businesses/${businessId}/attendances?from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`, []); const employees = useApiData<Employee[]>(`/api/businesses/${businessId}/employees`, [])
   function openCorrection(item: Attendance, type: 'in' | 'out') { setSelected(item); setModal(type); setError('') }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); const values = new FormData(event.currentTarget)

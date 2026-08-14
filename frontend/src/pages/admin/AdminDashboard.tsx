@@ -1,4 +1,5 @@
 import { CalendarClock, ClipboardCheck, ClockAlert, Timer, UserCheck, UsersRound, type LucideIcon } from 'lucide-react'
+import { useMemo } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { Loading, Notice } from '../../components/Feedback'
 import { PageHeader } from '../../components/PageHeader'
@@ -9,7 +10,8 @@ import type { DashboardSummary, Shift } from '../../types'
 export function AdminDashboard() {
   const { user } = useAuth(); const businessId = user.businessId
   const summary = useApiData<DashboardSummary>(`/api/businesses/${businessId}/dashboard`, {} as DashboardSummary)
-  const now = new Date(); const shifts = useApiData<Shift[]>(`/api/businesses/${businessId}/shifts?from=${encodeURIComponent(now.toISOString())}&to=${encodeURIComponent(new Date(now.getTime() + 7 * 86400000).toISOString())}`, [])
+  const shiftPeriod = useMemo(() => { const from = new Date(); return { from: from.toISOString(), to: new Date(from.getTime() + 7 * 86400000).toISOString() } }, [])
+  const shifts = useApiData<Shift[]>(`/api/businesses/${businessId}/shifts?from=${encodeURIComponent(shiftPeriod.from)}&to=${encodeURIComponent(shiftPeriod.to)}`, [])
   if (summary.loading) return <Loading />
   const metrics: Array<[LucideIcon, string, number, string]> = [
     [UsersRound, 'Empleados activos', summary.data.activeEmployees, 'Equipo habilitado'],

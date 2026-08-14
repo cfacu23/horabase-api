@@ -1,18 +1,78 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: horabase-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: horabase
-      POSTGRES_USER: horabase
+      POSTGRES_DB: ${DB_NAME:-horabase}
+      POSTGRES_USER: ${DB_USERNAME:-horabase}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - horabase_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U horabase -d horabase"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-horabase} -d ${DB_NAME:-horabase}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-horabase}
+      DB_USERNAME: ${DB_USERNAME:-horabase}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      JWT_ISSUER: ${JWT_ISSUER:-horabase-api}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      ATTENDANCE_SHIFT_MATCH_WINDOW_MINUTES: ${ATTENDANCE_SHIFT_MATCH_WINDOW_MINUTES:-240}
+      PASSWORD_RESET_EXPIRATION_MINUTES: ${PASSWORD_RESET_EXPIRATION_MINUTES:-30}
+      PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-http://localhost:3000/reset-password}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@horabase.local}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      HORABASE_BOOTSTRAP_ENABLED: ${HORABASE_BOOTSTRAP_ENABLED:-false}
+      HORABASE_BOOTSTRAP_BUSINESS_NAME: ${HORABASE_BOOTSTRAP_BUSINESS_NAME:-}
+      HORABASE_BOOTSTRAP_TAX_ID: ${HORABASE_BOOTSTRAP_TAX_ID:-}
+      HORABASE_BOOTSTRAP_ADMIN_DOCUMENT: ${HORABASE_BOOTSTRAP_ADMIN_DOCUMENT:-}
+      HORABASE_BOOTSTRAP_ADMIN_EMAIL: ${HORABASE_BOOTSTRAP_ADMIN_EMAIL:-}
+      HORABASE_BOOTSTRAP_ADMIN_PASSWORD: ${HORABASE_BOOTSTRAP_ADMIN_PASSWORD:-}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 10s
+      start_period: 120s
+      retries: 12
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5
